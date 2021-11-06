@@ -1,0 +1,562 @@
+<?php
+ defined('BASEPATH') OR exit('No direct script access allowed');
+require_once (APPPATH.'core/Custom_Controller.php');
+ class Admin_C extends Custom_Controller{
+
+   function __construct()
+    {
+        parent::__construct();
+        $this->load->library('session');
+        $this->load->model("AuthenticationModel");
+         $this->load->model("Encoder_M");
+         $this->load->model("Driver_M");
+         $this->load->model("StoreKeeper_M");
+         $this->load->model("Technician_M");
+         $this->load->model("Reception_M");
+         $this->load->model("Manager_M");
+         $this->load->Model('VehicleData_M');
+         $this->load->database();
+        $this->load->helper(array('url','html','form'));
+
+        if(!$this->session->userdata('admin'))
+            redirect(base_url() . "login");
+               
+    }
+   
+   public  function SystemHelpDashboard(){
+              $this->load->Model('AuthenticationModel');
+           $posts=$this->AuthenticationModel->getSystemHelp();
+                   $this->load->view('Admin/SystemHelpDashboard',['posts'=>$posts]);
+          }
+    public  function AdminDashboard(){
+             
+        if ($this->checkadminlogedin()){
+             
+         $this->load->model('AuthenticationModel');
+                    
+            
+          $post["printll"]=$this->AuthenticationModel->count_all_user();
+         $post["countactive"]=$this->AuthenticationModel->count_active_user();
+         $post["countinactive"]=$this->AuthenticationModel->count_inactive_user();
+        $username=$this->session->userdata('username');
+          $post["fetchimage"]=$this->AuthenticationModel->getImage($username);
+
+        $post["charttype"]=$this->db->query('select count(user_id) as total_user,user_type From tbl_users GROUP BY user_type')->result_array();  
+
+          $post["chartstatus"]=$this->db->query('select user_status,count(user_id) as total_user From tbl_users 
+            GROUP BY user_status')->result_array();
+                  
+            $this->load->view('Admin/AdminDashboard',$post);
+    
+             }
+           else{
+                redirect(base_url('Authentication/login'));
+            }
+           
+          }
+           public  function ManageUsers(){
+           
+           $posts=$this->AuthenticationModel->getPosts();
+            $this->load->view('Admin/Manageusers',['posts'=>$posts]);
+            // $this->load->view('footer'); 
+          }
+          public  function TechHelpDashboard(){
+       
+           $posts=$this->AuthenticationModel->getCase();
+                   $this->load->view('Admin/TechnicalHelpDashboard',['posts'=>$posts]);
+          }
+         public  function ManageTechHelp(){
+             $posts=$this->AuthenticationModel->getPosts();
+            $this->load->view('Admin/ManageTechnicalHelp',['posts'=>$posts]);
+          }
+          function technical_help_fetch($id)
+            {
+            
+         $post["fetch_data"]=$this->AuthenticationModel->fetch_technical_help($id);
+       
+            $this->load->view('Admin/EditTechnicalHelp',$post);
+      
+             }
+             function sys_help_fetch($id)
+            {
+            
+         $post["fetch_data"]=$this->AuthenticationModel->fetch_sys_help($id);
+       
+            $this->load->view('Admin/EditSystemHelp',$post);
+      
+             }
+          public function creat_users(){
+        
+            $this->load->view('Admin/CreateUsers');
+             }
+         public function creat_case(){
+        
+            $this->load->view('Admin/CreateCase');
+             }
+              public function creat_system_help(){
+        
+            $this->load->view('Admin/CreateSystemHelp');
+             }
+      
+      function UpdateUser($id)
+           { 
+        $this->load->model('AuthenticationModel');
+          $post["fetch_data"]=$this->AuthenticationModel->fetch_data($id);
+           // $this->load->view('header');
+            // $this->load->view('Admin/AdminNavbar');
+            $this->load->view('Admin/EditUsers',$post);
+            // $this->load->view('footer'); 
+         }
+
+    
+         public function add() 
+        {
+     $this->load->Library('form_validation');
+        // $this->form_validation->set_rules("username","username",'required|alpha|min_length[2]');
+        $this->form_validation->set_rules("username","username",'required|min_length[2]');
+        $this->form_validation->set_rules('email','email','required|min_length[2]');
+        $this->form_validation->set_rules('password','password','required|min_length[2]');
+         // $this->form_validation->set_rules('repassword','repassword','required|min_length[2]');
+         $this->form_validation->set_rules('usertype','usertype','required|min_length[2]');
+         
+
+
+        
+       if($this->form_validation->run()) 
+        { 
+
+           $config['upload_path'] = './images/';
+        $config['allowed_types'] = 'jpg|jpeg|png|gif';
+        $config['max_size'] = 2000;
+        $config['max_width'] = 1500;
+        $config['max_height'] = 1500;
+        $this->upload->initialize($config);
+        $this->load->library('upload', $config);
+         if (!$this->upload->do_upload('uploadimage'))
+                {
+                        // $error = array('error' => $this->upload->display_errors());
+                       // $this->load->view('Driver/RequestRegManage', $error);
+                       // redirect(base_url() . "Admin_C/saved" ,$error);
+                        // $this->load->view('upload_form', $error);
+
+                         $this->session->set_flashdata('errormsg','please upload image!');
+                       redirect(base_url() . "Admin_C/saved" ,'refresh');
+                }
+          else
+                {
+       
+                // $data = $this->input->post();
+                $info = $this->upload->data();
+                $infoimg=$info['file_name'];
+
+
+              // valid form
+           $this->load->model("AuthenticationModel");
+              $employeeid=$this->input->post("empid");
+             
+              if($this->AuthenticationModel->check_empid($employeeid)>=1)
+                 {
+           
+                $data=array(
+            "user_name" =>$this->input->post("username"),
+            "email" =>$this->input->post("email"),
+            "user_password"=>md5($this->input->post("password")),
+            // "user_password"=>$this->input->post("password"),
+            "user_type" =>$this->input->post("usertype"),
+            "user_image" =>$infoimg,
+            "emp_id" =>$this->input->post("empid"));
+
+              $this->AuthenticationModel->save_user($data);
+            $this->session->set_flashdata('successmsg','successfully saved!');
+                redirect(base_url() . "Admin_C/saved",'refresh');
+               // redirect(base_url() . "Admin_C/saved");
+               
+                 }
+               else{
+                $employeeid = $this->input->post("empid");
+                $this->session->set_flashdata('errormsg','This Employee ID is Not Found!');
+                redirect(base_url() . "Admin_C/saved",'refresh');
+
+               
+                  //  $this->StoreKeeper_M->set_available_quantity($availablequantity,$receive_voucno);
+                    //  $this->session->set_flashdata('errormsg', 'This Employee ID Not Found!');
+                    //  $this->creat_users();
+                   } 
+                }
+              }
+                      
+             else{
+                 $this->creat_users();
+                 }
+         // }
+      }
+       function saved()
+    {
+        $this->creat_users(); 
+    }
+    function saved_validate()
+    {
+        $this->creat_users(); 
+    }
+
+
+     public function update_user()
+    {
+        $this->load->Library('form_validation');
+        // $this->form_validation->set_rules("username","username",'required|alpha|min_length[2]');
+        $this->form_validation->set_rules("username","username",'required|min_length[2]');
+        $this->form_validation->set_rules('email','email','required|min_length[2]');
+        $this->form_validation->set_rules('password','password','required|min_length[2]');
+         $this->form_validation->set_rules('usertype','usertype','required|min_length[2]');
+         $this->form_validation->set_rules('userstatus','userstatus','required|min_length[2]');
+         
+        
+           $config['upload_path'] = './images/';
+        $config['allowed_types'] = 'jpg|jpeg|png|gif';
+        $config['max_size'] = 2000;
+        $config['max_width'] = 1500;
+        $config['max_height'] = 1500;
+        $this->upload->initialize($config);
+        $this->load->library('upload', $config);
+         if (!$this->upload->do_upload('uploadimage'))
+                {
+                        // $error = array('error' => $this->upload->display_errors());
+                         // $errormsg = array('error' => $this->upload->display_errors());
+                       // $this->load->view('Driver/RequestRegManage', $error);
+                          $this->session->set_flashdata('errormsg','please upload image!');
+                       redirect(base_url() . "Admin_C/updated" ,'refresh');
+                        // $this->load->view('upload_form', $error);
+                }
+          else
+                {
+       
+                // $data = $this->input->post();
+                $info = $this->upload->data();
+                $infoimgupdate=$info['file_name'];
+
+       if($this->form_validation->run()) 
+        { 
+        $this->load->model("AuthenticationModel");
+        $data=array( "user_name" =>$this->input->post("username"),
+            "email" =>$this->input->post("email"),
+            "user_password" =>md5($this->input->post("password")),"user_type" =>$this->input->post("usertype"),"user_status" =>$this->input->post("userstatus"),
+              "user_image" =>$infoimgupdate);
+        if($this->input->post("update"))
+        {
+            $this->AuthenticationModel->update_users($data,$this->input->post("hidden_id"));
+              $this->session->set_flashdata('successmsg','Request updated successfully');
+            redirect(base_url() . "Admin_C/updated",'refresh');
+
+           
+        }
+        else 
+        {
+             $this->session->set_flashdata('errormsg','Failed to update Request');
+           $this->ManageUsers();
+          
+        }
+         }
+             // redirect(base_url() . "Admin_C/ManageUsers");                        
+             else{
+                 $this->ManageUsers();
+                 }
+       }
+    }
+
+    function updated()
+    {
+          $this->ManageUsers();
+    }
+  function delete_user_c($camid){
+      
+        $this->load->model("AuthenticationModel");
+        $this->AuthenticationModel->delete_user_m($camid);
+        $this->session->set_flashdata('successmsg','user data deleted successfully');
+        redirect(base_url() . "Admin_C/deleted_user_redirect");
+        
+    }
+    public function deleted_user_redirect()
+    {
+      $this->AdminDashboard();  
+    }
+    function delete_techhelp_c($techid){
+      
+        $this->load->model("AuthenticationModel");
+        $this->AuthenticationModel->delete_techhelp_m($techid);
+        $this->session->set_flashdata('successmsg','data deleted successfully');
+        redirect(base_url() . "Admin_C/deleted_tech_redirect");
+        
+    }
+    public function deleted_tech_redirect()
+    {
+      $this->TechHelpDashboard();  
+    }
+    function delete_syshelp_c($sysid){
+      
+        $this->load->model("AuthenticationModel");
+        $this->AuthenticationModel->delete_techhelp_m($sysid);
+        $this->session->set_flashdata('successmsg','data deleted successfully');
+        redirect(base_url() . "Admin_C/deleted_sys_redirect");
+        
+    }
+    public function deleted_sys_redirect()
+    {
+      $this->SystemHelpDashboard();  
+    }
+     public function SubmitCase() 
+        {
+     $this->load->Library('form_validation');
+        $this->form_validation->set_rules("case_name","case_name",'required|min_length[2]');
+        $this->form_validation->set_rules('case_type','case_type','required|min_length[2]');
+        $this->form_validation->set_rules('case_solution','case_solution','required|min_length[2]');
+        $this->form_validation->set_rules('issue_date','issue_date','required|min_length[2]');
+           
+       if($this->form_validation->run()) 
+        { 
+              // valid form
+            $this->load->model("AuthenticationModel");
+        $data=array(
+            "case_name" =>$this->input->post("case_name"),
+            "case_type" =>$this->input->post("case_type"),"case_solution" =>$this->input->post("case_solution"),"issue_date" =>$this->input->post("issue_date"));
+                 
+                    // $this->load->StoreKeeper_M->save_storekeeper($data);
+
+           if($this->input->post("add"))
+            {
+            $this->AuthenticationModel->save_case($data);
+              $this->session->set_flashdata('successmsg','successfully Registered!');
+            redirect(base_url() . "Admin_C/savedcase",'refresh');
+
+           
+        }
+        else 
+        {
+             $this->session->set_flashdata('errormsg','Failed to save');
+           $this->RegCase();
+          
+        }
+      }
+        else{
+                 $this->RegCase();
+                 }
+
+             
+      }
+       function savedcase()
+    {
+          $this->RegCase();
+    }
+     public  function RegCase(){
+            
+            $this->load->view('Admin/CreateCase');
+          
+          }
+   public function SubmitSystemHelp() 
+        {
+     $this->load->Library('form_validation');
+        $this->form_validation->set_rules("system_help_name","system_help_name",'required|min_length[2]');
+        $this->form_validation->set_rules('system_help_description','system_help_description','required|min_length[2]');
+        $this->form_validation->set_rules('registered_date','registered_date','required|min_length[2]');
+       
+       if($this->form_validation->run()) 
+        { 
+              // valid form
+            $this->load->model("AuthenticationModel");
+        $data=array(
+            "system_help_name" =>$this->input->post("system_help_name"),
+            "system_help_description" =>$this->input->post("system_help_description"),"registered_date" =>$this->input->post("registered_date"));
+             
+
+           if($this->input->post("add"))
+            {
+            $this->AuthenticationModel->save_system_case($data);
+              $this->session->set_flashdata('successmsg','successfully Registered!');
+            redirect(base_url() . "Admin_C/savedSystemHelp",'refresh');
+
+           
+        }
+        else 
+        {
+             $this->session->set_flashdata('errormsg','Failed to save');
+           $this->RegSystemHelp();
+          
+        }
+      }
+        else{
+                 $this->RegSystemHelp();
+                 }
+
+             
+      }
+       function savedSystemHelp()
+          {
+                $this->SystemHelpDashboard();
+          }
+     public  function RegSystemHelp(){
+            
+            $this->load->view('Admin/SystemHelpDashboard');
+          
+          }
+          //update technical help
+          public function update_technical_help()
+          {
+       
+     $this->load->Library('form_validation');
+     $this->form_validation->set_rules('casename','casename','required|min_length[2]');
+     $this->form_validation->set_rules('casetype','casetype','required|min_length[1]');
+     $this->form_validation->set_rules('solution','solution','required|min_length[2]');
+     $this->form_validation->set_rules('issuedate','issuedate','required|min_length[2]|max_length[15]');
+       
+         if($this->form_validation->run()) 
+              { 
+              // valid form
+        $data=array( "case_id" =>$this->input->post("caseid"),
+                 "case_name" =>$this->input->post("casename"),
+                 "case_type" =>$this->input->post("casetype"),
+                  "case_solution" =>$this->input->post("solution"),
+                  "issue_date" =>$this->input->post("issuedate")
+                    );
+        if($this->input->post("update"))
+          {
+            $this->AuthenticationModel->update_technicalhelp_m($data,$this->input->post("hidden_id"));
+              $this->session->set_flashdata('successmsg','updated successfully');
+            redirect(base_url() . "Admin_C/TechHelpDashboard",'refresh');
+
+           
+        }
+        else 
+        {
+             $this->session->set_flashdata('errormsg','Failed to update');
+           $this->TechHelpDashboard();
+          
+        }
+      }
+        else
+        {
+           $this->TechHelpDashboard();
+        }
+       
+    }
+          //update system help
+    public function UpdateSystemHelp()
+          {
+       
+     $this->load->Library('form_validation');
+     $this->form_validation->set_rules('systemhelpname','system_help_name','required|min_length[2]');
+     $this->form_validation->set_rules('systemhelpdescription','system_help_description','required|min_length[1]');
+     $this->form_validation->set_rules('registereddate','registered_date','required|min_length[2]');
+           
+         if($this->form_validation->run()) 
+              { 
+              // valid form
+        $data=array( 
+                "syshelp_id" =>$this->input->post("syshelpid"),
+                "system_help_name" =>$this->input->post("systemhelpname"),
+                 "system_help_description" =>$this->input->post("systemhelpdescription"),
+                  "registered_date" =>$this->input->post("registereddate")
+                    );
+        if($this->input->post("update"))
+          {
+            $this->AuthenticationModel->update_systemhelp_m($data,$this->input->post("hidden_id"));
+              $this->session->set_flashdata('successmsg','updated successfully');
+            redirect(base_url() . "Admin_C/SystemHelpDashboard",'refresh');
+
+           
+        }
+        else 
+        {
+             $this->session->set_flashdata('errormsg','Failed to update');
+           $this->SystemHelpDashboard();
+          
+        }
+      }
+        else
+        {
+           $this->SystemHelpDashboard();
+        }
+       
+    }
+          //encoders part
+
+          public  function MemberRegManage() {
+               $posts=$this->Encoder_M->getMember();
+              $this->load->view('Admin/MemberRegManage' ,['posts'=>$posts]);
+                  }
+          public  function DriverDashboard(){
+             
+              $posts=$this->Encoder_M->getDriverData();
+              $this->load->view('Admin/DriverManage' ,['posts'=>$posts]);
+               }
+                public  function DriverManage(){
+                  $posts=$this->Encoder_M->getVehicleData();
+                 $this->load->view('Admin/VehicleDashboard' ,['posts'=>$posts]);
+              }
+               public  function VehicleDashboard(){
+                  $posts=$this->Encoder_M->getVehicleData();
+                 $this->load->view('Admin/VehicleDashboard' ,['posts'=>$posts]);
+              }
+              //drivers part
+               public  function RequestRegManage(){
+             $posts=$this->Driver_M->getRequest();
+            $this->load->view('Admin/RequestRegManage',['posts'=>$posts]);
+             }
+              public  function ViewStatus(){
+             $posts=$this->Driver_M->getRequest();
+            $this->load->view('Admin/ViewVhclStatus',['posts'=>$posts]);
+              }
+          //storekeeper part
+            public  function AccessoryManage(){
+               $posts=$this->StoreKeeper_M->getPosts();
+             $this->load->view('Admin/ManageAccessory',['posts'=>$posts]);
+                     }
+             public  function VehicleAssignment(){
+              $posts=$this->StoreKeeper_M->getVehicle();    
+              $this->load->view('Admin/VehicleAssignDashboard',['posts'=>$posts]);
+               }
+             public  function AccessoryConfirmManage(){
+             $posts=$this->StoreKeeper_M->getPosts();
+             $this->load->view('Admin/ConfirmAccessoryManage',['posts'=>$posts]);
+                     }
+                     // reception part
+              public  function ServiceAssignDashboard(){
+                    $posts=$this->Reception_M->getRequest();    
+              $this->load->view('Admin/VehicleServiceDashboard',['posts'=>$posts]);
+                   }
+               public  function ServiceRequestDashboard(){
+                    $posts=$this->Reception_M->getServiceDetail();    
+                   $this->load->view('Admin/ServiceRequestDashboard',['posts'=>$posts]);
+                  }
+                   //technician part
+            public  function ServiceDetailRegManage(){
+            $posts=$this->Technician_M->getService();
+            $this->load->view('Admin/VehicleServiceManage',['posts'=>$posts]);
+                }   
+             public  function AccessoryRequestManage(){
+              $posts=$this->Technician_M->getAccessory();    
+              $this->load->view('Admin/AccessoryRequestManage',['posts'=>$posts]);
+                }    
+               //manager part
+            public  function RequestApproveManage(){
+             $posts=$this->Manager_M->getRequest();
+            $this->load->view('Admin/ManagerRequestManage',['posts'=>$posts]);
+           
+            }
+            
+            
+    //     public function google_pie_chart() {
+
+    //        $alluserQuery=$this->db->select("SELECT COUNT(user_id) as countall FROM tbl_users");
+    //         $activeuserQuery=$this->db->select("SELECT COUNT(user_id) as countactive FROM tbl_users 
+    //         WHERE user_status = 'active'");
+    //          $inactiveuserQuery=$this->db->select("SELECT COUNT(user_id) as countainactive FROM tbl_users 
+    //          WHERE user_status = 'inactive'");
+
+    //          $data['all_user'] = $alluserQuery->result();
+    //         $data['active_user'] = $activeuserQuery->result();
+    //          $data['inactive_user'] = $inactiveuserQuery->result();
+    //         $this->load->view('Admin/AdminDashboard',$data);
+
+        
+    // }
+} 
+?>
